@@ -10,11 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "tbl_categories", uniqueConstraints = @UniqueConstraint(columnNames = { "name", "type", "profile_id" }) // prevent
-                                                                                                                      // duplicates
-                                                                                                                      // per
-                                                                                                                      // user
-)
+@Table(name = "tbl_categories", uniqueConstraints = @UniqueConstraint(columnNames = {"name", "type", "profile_id"}))
 @Getter
 @Setter
 @Builder
@@ -30,7 +26,7 @@ public class CategoryEntity {
     private String name;
 
     @Column(nullable = false)
-    private String type; // "INCOME" or "EXPENSE"
+    private String type;
 
     @Column(nullable = false)
     @Builder.Default

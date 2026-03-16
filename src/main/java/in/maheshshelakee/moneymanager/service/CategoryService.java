@@ -9,6 +9,7 @@ import in.maheshshelakee.moneymanager.repository.CategoryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -63,7 +64,6 @@ public class CategoryService {
 
         String normalizedType = request.getType().toUpperCase();
 
-        // Check duplicate only if name/type actually changed
         boolean nameChanged = !entity.getName().equalsIgnoreCase(request.getName().trim())
                 || !entity.getType().equalsIgnoreCase(normalizedType);
         if (nameChanged && categoryRepository.existsByNameAndTypeAndProfile(request.getName().trim(), normalizedType,
@@ -88,25 +88,28 @@ public class CategoryService {
         ProfileEntity profile = profileService.getProfileByEmail(email);
         CategoryEntity entity = categoryRepository.findByIdAndProfile(id, profile)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Category not found"));
-        categoryRepository.delete(entity); // subcategories cascade
+        categoryRepository.delete(entity);
     }
 
     // ─── DEFAULT CATEGORIES (called on user signup) ──────────────────────────
-    @Transactional
+    // FIX: REQUIRES_NEW so that a DB failure here does not silently roll back the
+    //      outer registerProfile() transaction. The caller receives a clear error
+    //      instead of a silent rollback with no feedback.
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void createDefaults(ProfileEntity profile) {
         List<Object[]> defaults = List.of(
-                new Object[] { "Salary", "INCOME", "💼", "#22c55e" },
-                new Object[] { "Freelance", "INCOME", "🖥️", "#10b981" },
-                new Object[] { "Investments", "INCOME", "📈", "#06b6d4" },
-                new Object[] { "Other Income", "INCOME", "💰", "#6366f1" },
-                new Object[] { "Food", "EXPENSE", "🍔", "#ef4444" },
-                new Object[] { "Transport", "EXPENSE", "🚗", "#f97316" },
-                new Object[] { "Shopping", "EXPENSE", "🛍️", "#8b5cf6" },
-                new Object[] { "Health", "EXPENSE", "🏥", "#ec4899" },
-                new Object[] { "Utilities", "EXPENSE", "💡", "#f59e0b" },
+                new Object[] { "Salary",        "INCOME",  "💼", "#22c55e" },
+                new Object[] { "Freelance",     "INCOME",  "🖥️", "#10b981" },
+                new Object[] { "Investments",   "INCOME",  "📈", "#06b6d4" },
+                new Object[] { "Other Income",  "INCOME",  "💰", "#6366f1" },
+                new Object[] { "Food",          "EXPENSE", "🍔", "#ef4444" },
+                new Object[] { "Transport",     "EXPENSE", "🚗", "#f97316" },
+                new Object[] { "Shopping",      "EXPENSE", "🛍️", "#8b5cf6" },
+                new Object[] { "Health",        "EXPENSE", "🏥", "#ec4899" },
+                new Object[] { "Utilities",     "EXPENSE", "💡", "#f59e0b" },
                 new Object[] { "Entertainment", "EXPENSE", "🎬", "#14b8a6" },
-                new Object[] { "Education", "EXPENSE", "📚", "#3b82f6" },
-                new Object[] { "Other", "EXPENSE", "📦", "#6b7280" });
+                new Object[] { "Education",     "EXPENSE", "📚", "#3b82f6" },
+                new Object[] { "Other",         "EXPENSE", "📦", "#6b7280" });
 
         List<CategoryEntity> entities = defaults.stream().map(row -> CategoryEntity.builder()
                 .name((String) row[0])

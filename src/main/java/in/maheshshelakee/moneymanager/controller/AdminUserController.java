@@ -1,6 +1,6 @@
 package in.maheshshelakee.moneymanager.controller;
 
-import in.maheshshelakee.moneymanager.dto.ProfileDTO;
+import in.maheshshelakee.moneymanager.dto.AdminUserDto;
 import in.maheshshelakee.moneymanager.dto.UserStatusUpdateDTO;
 import in.maheshshelakee.moneymanager.entity.ProfileEntity;
 import in.maheshshelakee.moneymanager.repository.ProfileRepository;
@@ -22,61 +22,73 @@ import jakarta.servlet.http.HttpServletRequest;
 @RestController
 @RequestMapping("/admin/users")
 @RequiredArgsConstructor
+@PreAuthorize("hasRole('ADMIN')")
 public class AdminUserController {
 
     private final ProfileRepository profileRepository;
     private final AdminAuditService adminAuditService;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Page<ProfileDTO>> getAllUsers(
+    public ResponseEntity<Page<AdminUserDto>> getAllUsers(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         Pageable pageable = PageRequest.of(page, size);
-        Page<ProfileDTO> users = profileRepository.findAll(pageable).map(this::toDTO);
+        // FIX: Was mapping to ProfileDTO (which lacks status/isActive). Now uses AdminUserDto
+        //      so callers always see the user's current status.
+        Page<AdminUserDto> users = profileRepository.findAll(pageable).map(this::toDto);
         return ResponseEntity.ok(users);
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ProfileDTO> getUserById(@PathVariable Long id) {
+    public ResponseEntity<AdminUserDto> getUserById(@PathVariable Long id) {
         ProfileEntity user = profileRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
-        return ResponseEntity.ok(toDTO(user));
+        // FIX: Return AdminUserDto (includes status) instead of ProfileDTO
+        return ResponseEntity.ok(toDto(user));
     }
 
     @PutMapping("/{id}/status")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ProfileDTO> updateUserStatus(
+    public ResponseEntity<AdminUserDto> updateUserStatus(
             @PathVariable Long id,
+            // FIX: Using UserStatusUpdateDTO (has both status + reason) consistently; removed
+            //      the duplicate UpdateUserStatusRequest which only had status and no reason.
             @Valid @RequestBody UserStatusUpdateDTO requestDTO,
             Authentication authentication,
             HttpServletRequest request) {
 
         ProfileEntity user = profileRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
-        
+
         String oldStatus = user.getStatus() != null ? user.getStatus().name() : "null";
         user.setStatus(requestDTO.getStatus());
+
+        // Keep isActive flag consistent with status
+        if (requestDTO.getStatus() != null) {
+            switch (requestDTO.getStatus()) {
+                case BANNED, SUSPENDED -> user.setIsActive(false);
+                case ACTIVE -> user.setIsActive(true);
+            }
+        }
         profileRepository.save(user);
 
         String adminEmail = authentication.getName();
-        String details = "Status changed from " + oldStatus + " to " + requestDTO.getStatus().name() 
+        String details = "Status changed from " + oldStatus + " to " + requestDTO.getStatus().name()
                 + ". Reason: " + requestDTO.getReason();
 
         adminAuditService.logAction(adminEmail, user.getId(), "USER_STATUS_UPDATED", details, request.getRemoteAddr());
 
-        return ResponseEntity.ok(toDTO(user));
+        return ResponseEntity.ok(toDto(user));
     }
 
-    private ProfileDTO toDTO(ProfileEntity entity) {
-        return ProfileDTO.builder()
+    // FIX: Replaced ProfileDTO mapping with AdminUserDto which exposes status and isActive
+    private AdminUserDto toDto(ProfileEntity entity) {
+        return AdminUserDto.builder()
                 .id(entity.getId())
                 .fullName(entity.getFullName())
                 .email(entity.getEmail())
-                .profileImageUrl(entity.getProfileImageUrl())
                 .createdAt(entity.getCreatedAt())
-                .updatedAt(entity.getUpdatedAt())
+                .isActive(entity.getIsActive())
+                .status(entity.getStatus())
                 .build();
     }
 }

@@ -24,9 +24,7 @@ public class IncomeService {
     public List<IncomeDTO> getAll(String email) {
         ProfileEntity profile = profileService.getProfileByEmail(email);
         return incomeRepository.findByProfileOrderByDateDesc(profile)
-                .stream()
-                .map(this::toDTO)
-                .collect(Collectors.toList());
+                .stream().map(this::toDTO).collect(Collectors.toList());
     }
 
     @Transactional

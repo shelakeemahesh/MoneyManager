@@ -63,27 +63,26 @@ public class AdminService {
 
         UserStatus oldStatus = targetUser.getStatus();
         targetUser.setStatus(newStatus);
-        
-        // Also toggle isActive flag for consistency if needed, assuming BANNED/SUSPENDED implies inactive
+
         if (newStatus == UserStatus.BANNED || newStatus == UserStatus.SUSPENDED) {
             targetUser.setIsActive(false);
         } else if (newStatus == UserStatus.ACTIVE && oldStatus != UserStatus.ACTIVE) {
             targetUser.setIsActive(true);
         }
-        
+
         profileRepository.save(targetUser);
 
-        // create audit log
         AdminAuditLog logEntry = AdminAuditLog.builder()
                 .admin(admin)
                 .targetUser(targetUser)
                 .action("UPDATE_USER_STATUS")
-                .details(String.format("Changed status from %s to %s for user %s", oldStatus, newStatus, targetUser.getEmail()))
+                .details(String.format("Changed status from %s to %s for user %s",
+                        oldStatus, newStatus, targetUser.getEmail()))
                 .ipAddress(ipAddress)
                 .build();
 
         adminAuditLogRepository.save(logEntry);
-        
+
         log.info("Admin {} changed status of user {} to {}", adminEmail, targetUser.getEmail(), newStatus);
     }
 }

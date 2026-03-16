@@ -1,5 +1,6 @@
 package in.maheshshelakee.moneymanager.exception;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -12,6 +13,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -78,9 +80,13 @@ public class GlobalExceptionHandler {
 
     /**
      * Fallback — catches any unexpected runtime exception → 500
+     * FIX: Added log.error so that the full stack trace is visible in logs.
+     *      Previously the exception was silently swallowed and only a generic
+     *      500 message was returned, making production debugging very difficult.
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleAll(Exception ex) {
+        log.error("Unhandled exception caught by GlobalExceptionHandler", ex);
         ErrorResponse body = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.INTERNAL_SERVER_ERROR.value())

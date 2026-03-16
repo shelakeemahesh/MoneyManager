@@ -15,12 +15,12 @@ import java.util.Map;
 @RestController
 @RequestMapping("/admin/stats")
 @RequiredArgsConstructor
+@PreAuthorize("hasRole('ADMIN')")
 public class AdminStatsController {
 
     private final ProfileRepository profileRepository;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, Object>> getSystemStats() {
         long totalUsers = profileRepository.count();
         long activeUsers = profileRepository.countByStatus(UserStatus.ACTIVE);

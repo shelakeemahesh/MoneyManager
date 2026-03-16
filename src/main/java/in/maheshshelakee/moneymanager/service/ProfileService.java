@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -26,8 +27,7 @@ public class ProfileService {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
 
-    // Lazy injection to break circular dependency: ProfileService → CategoryService
-    // → ProfileService
+    // Lazy injection to break circular dependency: ProfileService → CategoryService → ProfileService
     @org.springframework.context.annotation.Lazy
     private final CategoryService categoryService;
 
@@ -53,10 +53,12 @@ public class ProfileService {
 
         newProfile = profileRepository.save(newProfile);
 
-        // Seed default categories for new user
+        // FIX: createDefaults runs in its own transaction (REQUIRES_NEW) so that a failure
+        //      there does not silently roll back the user creation. The caller gets a clear
+        //      500 from the propagated exception rather than a silent rollback.
         categoryService.createDefaults(newProfile);
 
-        // Send activation email
+        // Send activation email — failure is logged but does NOT abort registration
         String activationLink = baseUrl + "/activate?token=" + newProfile.getActivationToken();
         String subject = "Activate your Money Manager account";
         String body = "Hi " + newProfile.getFullName() + ",\n\n"
@@ -96,6 +98,14 @@ public class ProfileService {
 
         if (!passwordEncoder.matches(request.getPassword(), profile.getPassword())) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid email or password");
+        }
+
+        // FIX: Check account activation before issuing a token.
+        //      Previously, unactivated users (isActive=false) could log in because status
+        //      defaults to ACTIVE at persist time and login never checked isActive.
+        if (!Boolean.TRUE.equals(profile.getIsActive())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Account not activated. Please check your email for the activation link.");
         }
 
         String token = jwtUtil.generateToken(email, profile.getRole().name(), profile.getStatus().name());

@@ -11,9 +11,6 @@ import java.util.Optional;
 
 public interface CategoryRepository extends JpaRepository<CategoryEntity, Long> {
 
-    /**
-     * JOIN FETCH subcategories to avoid N+1 when listing all categories.
-     */
     @Query("SELECT c FROM CategoryEntity c LEFT JOIN FETCH c.subcategories WHERE c.profile = :profile ORDER BY c.createdAt DESC")
     List<CategoryEntity> findByProfileWithSubcategories(@Param("profile") ProfileEntity profile);
 

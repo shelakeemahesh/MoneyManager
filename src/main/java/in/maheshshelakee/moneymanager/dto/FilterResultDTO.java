@@ -15,11 +15,11 @@ import java.time.LocalDate;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class FilterResultDTO {
     private Long id;
-    private String label;        // source (income) or title (expense)
-    private String type;         // "Income" or "Expense"
+    private String label;
+    private String type;
     private Double amount;
     private LocalDate date;
     private String icon;
-    private String note;         // expense only
-    private String paymentMethod; // expense only
+    private String note;
+    private String paymentMethod;
 }

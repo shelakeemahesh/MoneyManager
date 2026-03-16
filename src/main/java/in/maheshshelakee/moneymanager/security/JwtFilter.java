@@ -35,17 +35,30 @@ public class JwtFilter extends OncePerRequestFilter {
             if (jwtUtil.isTokenValid(token)) {
                 String email = jwtUtil.extractEmail(token);
                 String role = jwtUtil.extractRole(token);
+
+                // FIX: Guard null status claim — tokens issued by an older app version may not
+                //      carry this claim. Default to "ACTIVE" so they are not silently passed
+                //      through, but are still treated as valid non-banned sessions.
+                //      (The real status check on login and the DB-based guard in AdminService
+                //      are the authoritative sources; this is a defence-in-depth layer.)
                 String status = jwtUtil.extractStatus(token);
+                if (status == null) {
+                    status = "ACTIVE";
+                }
 
                 if ("BANNED".equals(status) || "SUSPENDED".equals(status)) {
-                    response.sendError(HttpServletResponse.SC_FORBIDDEN, "User account is " + status.toLowerCase());
+                    response.sendError(HttpServletResponse.SC_FORBIDDEN,
+                            "User account is " + status.toLowerCase());
                     return;
                 }
 
                 if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                    SimpleGrantedAuthority authority = new SimpleGrantedAuthority("ROLE_" + (role != null ? role : "USER"));
-                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(email, null,
-                            Collections.singletonList(authority));
+                    // FIX: Guard null role claim the same way
+                    String resolvedRole = (role != null) ? role : "USER";
+                    SimpleGrantedAuthority authority = new SimpleGrantedAuthority("ROLE_" + resolvedRole);
+                    UsernamePasswordAuthenticationToken authToken =
+                            new UsernamePasswordAuthenticationToken(email, null,
+                                    Collections.singletonList(authority));
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
                 }

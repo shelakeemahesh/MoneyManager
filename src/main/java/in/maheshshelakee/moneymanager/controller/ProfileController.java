@@ -19,28 +19,24 @@ public class ProfileController {
 
     private final ProfileService profileService;
 
-    // POST /register
     @PostMapping("/register")
     public ResponseEntity<ProfileDTO> registerProfile(@Valid @RequestBody ProfileDTO profileDTO) {
         ProfileDTO registered = profileService.registerProfile(profileDTO);
         return ResponseEntity.status(HttpStatus.CREATED).body(registered);
     }
 
-    // POST /login
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         LoginResponse response = profileService.login(request);
         return ResponseEntity.ok(response);
     }
 
-    // GET /activate?token=
     @GetMapping("/activate")
     public ResponseEntity<Map<String, String>> activateAccount(@RequestParam String token) {
         String message = profileService.activateAccount(token);
         return ResponseEntity.ok(Map.of("message", message));
     }
 
-    // POST /forgot-password
     @PostMapping("/forgot-password")
     public ResponseEntity<Map<String, String>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
         profileService.forgotPassword(request);

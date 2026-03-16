@@ -19,7 +19,7 @@ import java.time.LocalDateTime;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ProfileDTO {
 
-    private Long id; // Use Long (not long) so it serializes as null for new objects
+    private Long id;
 
     @NotBlank(message = "Full name is required")
     @Size(min = 2, max = 100, message = "Full name must be between 2 and 100 characters")
@@ -31,7 +31,7 @@ public class ProfileDTO {
 
     @NotBlank(message = "Password is required")
     @Size(min = 6, message = "Password must be at least 6 characters")
-    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY) // accept in requests, never return in responses
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
 
     private String profileImageUrl;

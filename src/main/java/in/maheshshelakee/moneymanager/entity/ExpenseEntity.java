@@ -35,9 +35,6 @@ public class ExpenseEntity {
     @Column(nullable = false)
     private LocalDate expenseDate;
 
-    /**
-     * Payment method: CASH | CARD | UPI | BANK_TRANSFER | OTHER
-     */
     @Column(nullable = false)
     private String paymentMethod;
 

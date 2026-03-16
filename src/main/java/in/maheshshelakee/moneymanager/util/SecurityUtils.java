@@ -7,14 +7,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 public class SecurityUtils {
 
-    private SecurityUtils() {
-    }
+    private SecurityUtils() {}
 
-    /**
-     * Returns the email of the currently authenticated user.
-     * Throws 401 if no authentication is present in the SecurityContext
-     * (guards against NPE on unauthenticated paths or OPTIONS preflight requests).
-     */
     public static String getCurrentUserEmail() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getName())) {

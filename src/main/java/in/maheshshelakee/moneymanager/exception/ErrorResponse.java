@@ -9,7 +9,7 @@ import java.util.Map;
 
 @Data
 @Builder
-@JsonInclude(JsonInclude.Include.NON_NULL) // omits null fieldErrors from responses without field errors
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class ErrorResponse {
     private LocalDateTime timestamp;
     private int status;

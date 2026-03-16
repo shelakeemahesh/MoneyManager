@@ -36,6 +36,9 @@ public class AdminAuditLog {
     @Column(name = "ip_address", length = 45)
     private String ipAddress;
 
+    // FIX: createdAt is managed solely by @CreationTimestamp.
+    //      The manual .createdAt(LocalDateTime.now()) builder call in AdminAuditService
+    //      has been removed — setting it via builder bypassed this annotation.
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;

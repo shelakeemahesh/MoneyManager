@@ -5,8 +5,10 @@ import in.maheshshelakee.moneymanager.entity.ProfileEntity;
 import in.maheshshelakee.moneymanager.repository.ExpenseRepository;
 import in.maheshshelakee.moneymanager.repository.IncomeRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.util.Comparator;
@@ -43,8 +45,8 @@ public class FilterService {
                             .icon(i.getIcon())
                             .build())
                     .collect(Collectors.toList());
-        } else {
-            // Updated to use renamed field: date → expenseDate (ExpenseEntity v2)
+
+        } else if ("Expense".equalsIgnoreCase(type)) {
             var expenses = (startDate != null && endDate != null)
                     ? expenseRepository.findByProfileAndExpenseDateBetweenOrderByExpenseDateDesc(
                             profile, startDate, endDate)
@@ -62,6 +64,12 @@ public class FilterService {
                             .paymentMethod(e.getPaymentMethod())
                             .build())
                     .collect(Collectors.toList());
+
+        } else {
+            // FIX: Previously any unknown type silently returned income results.
+            //      Now we fail fast with a clear 400.
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Invalid type '" + type + "'. Must be 'Income' or 'Expense'.");
         }
 
         // Keyword search
@@ -72,10 +80,20 @@ public class FilterService {
                     .collect(Collectors.toList());
         }
 
-        // Sorting
-        Comparator<FilterResultDTO> comparator = "Amount".equalsIgnoreCase(sortField)
-                ? Comparator.comparingDouble(r -> r.getAmount() != null ? r.getAmount() : 0)
-                : Comparator.comparing(r -> r.getDate() != null ? r.getDate() : LocalDate.MIN);
+        // FIX: Use explicit generic type on comparator to avoid unchecked-cast issues.
+        //      Added guard for unknown sortField values — previously an unknown value
+        //      silently fell through to date sort with no error or warning.
+        Comparator<FilterResultDTO> comparator;
+        if ("Amount".equalsIgnoreCase(sortField)) {
+            comparator = Comparator.comparingDouble(
+                    (FilterResultDTO r) -> r.getAmount() != null ? r.getAmount() : 0.0);
+        } else if ("Date".equalsIgnoreCase(sortField) || sortField == null || sortField.isBlank()) {
+            comparator = Comparator.comparing(
+                    (FilterResultDTO r) -> r.getDate() != null ? r.getDate() : LocalDate.MIN);
+        } else {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Invalid sortField '" + sortField + "'. Must be 'Date' or 'Amount'.");
+        }
 
         if ("Descending".equalsIgnoreCase(sortOrder)) {
             comparator = comparator.reversed();

@@ -19,20 +19,17 @@ public class SubCategoryController {
 
     private final SubCategoryService subCategoryService;
 
-    // POST /subcategories
     @PostMapping
     public ResponseEntity<SubCategoryResponse> create(@Valid @RequestBody SubCategoryRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(subCategoryService.create(request, SecurityUtils.getCurrentUserEmail()));
     }
 
-    // GET /subcategories/{categoryId}
     @GetMapping("/{categoryId}")
     public ResponseEntity<List<SubCategoryResponse>> getByCategoryId(@PathVariable Long categoryId) {
         return ResponseEntity.ok(subCategoryService.getByCategoryId(categoryId, SecurityUtils.getCurrentUserEmail()));
     }
 
-    // DELETE /subcategories/{id}
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         subCategoryService.delete(id, SecurityUtils.getCurrentUserEmail());

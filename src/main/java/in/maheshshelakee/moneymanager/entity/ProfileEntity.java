@@ -26,7 +26,6 @@ public class ProfileEntity {
     private String email;
 
     private String password;
-
     private String profileImageUrl;
 
     @CreationTimestamp
@@ -37,7 +36,6 @@ public class ProfileEntity {
     private LocalDateTime updatedAt;
 
     private Boolean isActive;
-
     private String activationToken;
 
     @Enumerated(EnumType.STRING)

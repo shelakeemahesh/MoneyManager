@@ -27,21 +27,17 @@ public class SubCategoryService {
     public List<SubCategoryResponse> getByCategoryId(Long categoryId, String email) {
         CategoryEntity category = categoryService.getCategoryByIdAndEmail(categoryId, email);
         return subCategoryRepository.findByCategoryOrderByCreatedAtDesc(category)
-                .stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+                .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
     @Transactional
     public SubCategoryResponse create(SubCategoryRequest request, String email) {
         CategoryEntity category = categoryService.getCategoryByIdAndEmail(request.getCategoryId(), email);
-
         SubCategoryEntity entity = SubCategoryEntity.builder()
                 .name(request.getName().trim())
                 .icon(request.getIcon() != null && !request.getIcon().isBlank() ? request.getIcon() : "📌")
                 .category(category)
                 .build();
-
         return toResponse(subCategoryRepository.save(entity));
     }
 

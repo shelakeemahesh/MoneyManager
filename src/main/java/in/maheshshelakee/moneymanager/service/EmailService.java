@@ -19,11 +19,6 @@ public class EmailService {
     @Value("${spring.mail.properties.mail.smtp.from:noreply@example.com}")
     private String fromEmail;
 
-    /**
-     * Sends a plain-text email.
-     * Failures are logged as errors but do NOT crash the calling transaction —
-     * the caller (e.g. registration) completes successfully even if email delivery fails.
-     */
     public void sendEmail(String to, String subject, String body) {
         try {
             SimpleMailMessage message = new SimpleMailMessage();
@@ -34,7 +29,6 @@ public class EmailService {
             mailSender.send(message);
             log.info("Email sent to {}", to);
         } catch (Exception e) {
-            // Log full stack trace — System.err.println hides root cause in production
             log.error("Failed to send email to {}: {}", to, e.getMessage(), e);
         }
     }

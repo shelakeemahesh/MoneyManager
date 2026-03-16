@@ -12,42 +12,21 @@ import java.util.Optional;
 
 public interface ExpenseRepository extends JpaRepository<ExpenseEntity, Long> {
 
-    // ─── Basic Queries ─────────────────────────────────────────────────────────
-
     List<ExpenseEntity> findByProfileOrderByExpenseDateDesc(ProfileEntity profile);
 
     Optional<ExpenseEntity> findByIdAndProfile(Long id, ProfileEntity profile);
 
-    // ─── Date Range Filter ─────────────────────────────────────────────────────
-
     List<ExpenseEntity> findByProfileAndExpenseDateBetweenOrderByExpenseDateDesc(
-            ProfileEntity profile,
-            LocalDate startDate,
-            LocalDate endDate
-    );
-
-    // ─── Category Filter ───────────────────────────────────────────────────────
+            ProfileEntity profile, LocalDate startDate, LocalDate endDate);
 
     List<ExpenseEntity> findByProfileAndCategoryIgnoreCaseOrderByExpenseDateDesc(
-            ProfileEntity profile,
-            String category
-    );
-
-    // ─── Category + Date Range Combined Filter ─────────────────────────────────
+            ProfileEntity profile, String category);
 
     List<ExpenseEntity> findByProfileAndCategoryIgnoreCaseAndExpenseDateBetweenOrderByExpenseDateDesc(
-            ProfileEntity profile,
-            String category,
-            LocalDate startDate,
-            LocalDate endDate
-    );
-
-    // ─── Aggregate: Total Expense Amount ───────────────────────────────────────
+            ProfileEntity profile, String category, LocalDate startDate, LocalDate endDate);
 
     @Query("SELECT COALESCE(SUM(e.amount), 0) FROM ExpenseEntity e WHERE e.profile = :profile")
     Double sumAmountByProfile(@Param("profile") ProfileEntity profile);
-
-    // ─── Admin Aggregates ──────────────────────────────────────────────────────
 
     @Query("SELECT COALESCE(SUM(e.amount), 0) FROM ExpenseEntity e")
     Double sumAllExpenses();

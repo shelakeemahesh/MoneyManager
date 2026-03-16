@@ -21,8 +21,6 @@ public class ExpenseService {
     private final ExpenseRepository expenseRepository;
     private final ProfileService profileService;
 
-    // ─── GET ALL ───────────────────────────────────────────────────────────────
-
     @Transactional(readOnly = true)
     public List<ExpenseResponse> getAll(String email) {
         ProfileEntity profile = profileService.getProfileByEmail(email);
@@ -32,8 +30,6 @@ public class ExpenseService {
                 .collect(Collectors.toList());
     }
 
-    // ─── GET BY ID ─────────────────────────────────────────────────────────────
-
     @Transactional(readOnly = true)
     public ExpenseResponse getById(Long id, String email) {
         ProfileEntity profile = profileService.getProfileByEmail(email);
@@ -41,8 +37,6 @@ public class ExpenseService {
                 .orElseThrow(() -> new ResourceNotFoundException("Expense", id));
         return toResponse(entity);
     }
-
-    // ─── CREATE ────────────────────────────────────────────────────────────────
 
     @Transactional
     public ExpenseResponse add(ExpenseRequest request, String email) {
@@ -59,8 +53,6 @@ public class ExpenseService {
                 .build();
         return toResponse(expenseRepository.save(entity));
     }
-
-    // ─── UPDATE ────────────────────────────────────────────────────────────────
 
     @Transactional
     public ExpenseResponse update(Long id, ExpenseRequest request, String email) {
@@ -80,8 +72,6 @@ public class ExpenseService {
         return toResponse(expenseRepository.save(entity));
     }
 
-    // ─── DELETE ────────────────────────────────────────────────────────────────
-
     @Transactional
     public void delete(Long id, String email) {
         ProfileEntity profile = profileService.getProfileByEmail(email);
@@ -89,8 +79,6 @@ public class ExpenseService {
                 .orElseThrow(() -> new ResourceNotFoundException("Expense", id));
         expenseRepository.delete(entity);
     }
-
-    // ─── FILTER BY CATEGORY ────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
     public List<ExpenseResponse> getByCategory(String category, String email) {
@@ -101,8 +89,6 @@ public class ExpenseService {
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }
-
-    // ─── FILTER BY DATE RANGE ──────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
     public List<ExpenseResponse> getByDateRange(LocalDate startDate, LocalDate endDate, String email) {
@@ -117,16 +103,13 @@ public class ExpenseService {
                 .collect(Collectors.toList());
     }
 
-    // ─── TOTAL AMOUNT ──────────────────────────────────────────────────────────
-
     @Transactional(readOnly = true)
     public Double getTotalAmount(String email) {
         ProfileEntity profile = profileService.getProfileByEmail(email);
-        Double total = expenseRepository.sumAmountByProfile(profile);
-        return total != null ? total : 0.0;
+        // FIX: Removed the redundant null-check. The JPQL query already uses COALESCE which
+        //      guarantees a non-null result. One authoritative null-guard is cleaner than two.
+        return expenseRepository.sumAmountByProfile(profile);
     }
-
-    // ─── HELPER: Entity → Response DTO ────────────────────────────────────────
 
     public ExpenseResponse toResponse(ExpenseEntity entity) {
         return ExpenseResponse.builder()
@@ -142,8 +125,6 @@ public class ExpenseService {
                 .updatedAt(entity.getUpdatedAt())
                 .build();
     }
-
-    // ─── HELPER: Resolve icon with default fallback ────────────────────────────
 
     private String resolveIcon(String icon) {
         return (icon != null && !icon.isBlank()) ? icon : "🛒";

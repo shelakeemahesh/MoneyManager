@@ -28,9 +28,7 @@ public class IncomeEntity {
     private Double amount;
 
     private LocalDate date;
-
     private String category;
-
     private String icon;
 
     @ManyToOne(fetch = FetchType.LAZY)

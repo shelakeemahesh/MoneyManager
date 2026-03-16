@@ -6,10 +6,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
-/**
- * Lightweight health-check endpoint. Whitelisted in SecurityConfig (/health, /status).
- * Returns JSON (not plain String) for compatibility with load balancer checks.
- */
 @RestController
 public class HomeController {
 

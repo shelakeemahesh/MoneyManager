@@ -11,10 +11,6 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 
-/**
- * Incoming request payload for creating or updating an expense.
- * All required fields are validated with Bean Validation annotations.
- */
 @Data
 @Builder
 @NoArgsConstructor
@@ -36,9 +32,6 @@ public class ExpenseRequest {
     @NotNull(message = "Expense date is required")
     private LocalDate expenseDate;
 
-    /**
-     * Accepted values: CASH, CARD, UPI, BANK_TRANSFER, OTHER
-     */
     @NotBlank(message = "Payment method is required")
     @Pattern(
         regexp = "^(CASH|CARD|UPI|BANK_TRANSFER|OTHER)$",
@@ -46,8 +39,5 @@ public class ExpenseRequest {
     )
     private String paymentMethod;
 
-    /**
-     * Optional emoji icon. Defaults to 🛒 in service layer if not provided.
-     */
     private String icon;
 }

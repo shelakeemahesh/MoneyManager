@@ -13,15 +13,16 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+// NOTE: N+1 issue on lazy admin/targetUser — see AdminAuditLogRepository for the JOIN FETCH fix
 @RestController
 @RequestMapping("/admin/audit-logs")
 @RequiredArgsConstructor
+@PreAuthorize("hasRole('ADMIN')")
 public class AdminAuditController {
 
     private final AdminAuditLogRepository adminAuditLogRepository;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Page<AdminAuditLog>> getAuditLogs(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {

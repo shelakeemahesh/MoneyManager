@@ -19,21 +19,19 @@ import java.util.List;
 @RequiredArgsConstructor
 public class FilterController {
 
-        private final FilterService filterService;
+    private final FilterService filterService;
 
-        @GetMapping
-        public ResponseEntity<List<FilterResultDTO>> filter(
-                        @RequestParam(defaultValue = "Income") String type,
-                        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-                        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
-                        @RequestParam(defaultValue = "Date") String sortField,
-                        @RequestParam(defaultValue = "Descending") String sortOrder,
-                        @RequestParam(defaultValue = "") String search) {
+    @GetMapping
+    public ResponseEntity<List<FilterResultDTO>> filter(
+            @RequestParam(defaultValue = "Income") String type,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(defaultValue = "Date") String sortField,
+            @RequestParam(defaultValue = "Descending") String sortOrder,
+            @RequestParam(defaultValue = "") String search) {
 
-                List<FilterResultDTO> results = filterService.filter(
-                                SecurityUtils.getCurrentUserEmail(),
-                                type, startDate, endDate, sortField, sortOrder, search);
-
-                return ResponseEntity.ok(results);
-        }
+        List<FilterResultDTO> results = filterService.filter(
+                SecurityUtils.getCurrentUserEmail(), type, startDate, endDate, sortField, sortOrder, search);
+        return ResponseEntity.ok(results);
+    }
 }
