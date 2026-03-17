@@ -13,16 +13,23 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
+import in.maheshshelakee.moneymanager.service.CategoryService;
+
 @RestController
 @RequiredArgsConstructor
 public class ProfileController {
 
     private final ProfileService profileService;
+    private final CategoryService categoryService;
 
     // POST /register
     @PostMapping("/register")
     public ResponseEntity<ProfileDTO> registerProfile(@Valid @RequestBody ProfileDTO profileDTO) {
         ProfileDTO registered = profileService.registerProfile(profileDTO);
+        
+        // Seed default categories for new user (moved here to prevent circular dependency)
+        categoryService.createDefaultsByEmail(registered.getEmail());
+        
         return ResponseEntity.status(HttpStatus.CREATED).body(registered);
     }
 
