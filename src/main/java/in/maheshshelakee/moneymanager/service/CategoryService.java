@@ -20,6 +20,8 @@ import java.util.stream.Collectors;
 public class CategoryService {
 
     private final CategoryRepository categoryRepository;
+
+    @org.springframework.context.annotation.Lazy
     private final ProfileService profileService;
 
     // ─── READ ──────────────────────────────────────────────────────────────────
