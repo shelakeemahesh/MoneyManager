@@ -20,8 +20,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class CategoryService {
 
-    // ProfileRepository used directly (not ProfileService) to avoid circular dependency:
-    // ProfileService --@Lazy--> CategoryService --> ProfileRepository  ✅
+    // Uses ProfileRepository directly (not ProfileService) to avoid circular dependency.
+    // ProfileService uses CategoryRepository directly for the same reason.
     private final CategoryRepository categoryRepository;
     private final ProfileRepository profileRepository;
 
@@ -98,36 +98,6 @@ public class CategoryService {
         CategoryEntity entity = categoryRepository.findByIdAndProfile(id, profile)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Category not found"));
         categoryRepository.delete(entity);
-    }
-
-    // ─── DEFAULT CATEGORIES (called by ProfileService on registration) ────────
-    @Transactional
-    public void createDefaults(ProfileEntity profile) {
-        List<Object[]> defaults = List.of(
-                new Object[]{"Salary",        "INCOME",  "💼", "#22c55e"},
-                new Object[]{"Freelance",     "INCOME",  "🖥️", "#10b981"},
-                new Object[]{"Investments",   "INCOME",  "📈", "#06b6d4"},
-                new Object[]{"Other Income",  "INCOME",  "💰", "#6366f1"},
-                new Object[]{"Food",          "EXPENSE", "🍔", "#ef4444"},
-                new Object[]{"Transport",     "EXPENSE", "🚗", "#f97316"},
-                new Object[]{"Shopping",      "EXPENSE", "🛍️", "#8b5cf6"},
-                new Object[]{"Health",        "EXPENSE", "🏥", "#ec4899"},
-                new Object[]{"Utilities",     "EXPENSE", "💡", "#f59e0b"},
-                new Object[]{"Entertainment", "EXPENSE", "🎬", "#14b8a6"},
-                new Object[]{"Education",     "EXPENSE", "📚", "#3b82f6"},
-                new Object[]{"Other",         "EXPENSE", "📦", "#6b7280"});
-
-        List<CategoryEntity> entities = defaults.stream()
-                .map(row -> CategoryEntity.builder()
-                        .name((String) row[0])
-                        .type((String) row[1])
-                        .icon((String) row[2])
-                        .color((String) row[3])
-                        .profile(profile)
-                        .build())
-                .collect(Collectors.toList());
-
-        categoryRepository.saveAll(entities);
     }
 
     // ─── GET BY ID + EMAIL ────────────────────────────────────────────────────

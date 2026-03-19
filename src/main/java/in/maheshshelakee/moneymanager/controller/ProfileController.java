@@ -23,7 +23,6 @@ public class ProfileController {
     // POST /register
     @PostMapping("/register")
     public ResponseEntity<ProfileDTO> registerProfile(@Valid @RequestBody ProfileDTO profileDTO) {
-        // CategoryService.createDefaults is triggered via UserRegisteredEvent — no direct dependency needed
         ProfileDTO registered = profileService.registerProfile(profileDTO);
         return ResponseEntity.status(HttpStatus.CREATED).body(registered);
     }
