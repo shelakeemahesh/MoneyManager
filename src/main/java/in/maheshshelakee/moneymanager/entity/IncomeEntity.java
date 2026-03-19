@@ -29,6 +29,7 @@ public class IncomeEntity {
     @Column(nullable = false)
     private Double amount;
 
+    @Column(nullable = false)
     private LocalDate date;
 
     private String category;
@@ -46,3 +47,4 @@ public class IncomeEntity {
     @UpdateTimestamp
     private LocalDateTime updatedAt;
 }
+

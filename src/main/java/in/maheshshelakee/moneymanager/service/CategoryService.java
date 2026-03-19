@@ -5,8 +5,10 @@ import in.maheshshelakee.moneymanager.dto.CategoryResponse;
 import in.maheshshelakee.moneymanager.dto.SubCategoryResponse;
 import in.maheshshelakee.moneymanager.entity.CategoryEntity;
 import in.maheshshelakee.moneymanager.entity.ProfileEntity;
+import in.maheshshelakee.moneymanager.event.UserRegisteredEvent;
 import in.maheshshelakee.moneymanager.repository.CategoryRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.event.EventListener;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -104,44 +106,50 @@ public class CategoryService {
                 categoryRepository.delete(entity);
         }
 
-        // ─── DEFAULT CATEGORIES ──────────────────────────────────────────────────
-        @Transactional
-        public void createDefaults(ProfileEntity profile) {
-                List<Object[]> defaults = List.of(
-                                new Object[] { "Salary", "INCOME", "💼", "#22c55e" },
-                                new Object[] { "Freelance", "INCOME", "🖥️", "#10b981" },
-                                new Object[] { "Investments", "INCOME", "📈", "#06b6d4" },
-                                new Object[] { "Other Income", "INCOME", "💰", "#6366f1" },
-                                new Object[] { "Food", "EXPENSE", "🍔", "#ef4444" },
-                                new Object[] { "Transport", "EXPENSE", "🚗", "#f97316" },
-                                new Object[] { "Shopping", "EXPENSE", "🛍️", "#8b5cf6" },
-                                new Object[] { "Health", "EXPENSE", "🏥", "#ec4899" },
-                                new Object[] { "Utilities", "EXPENSE", "💡", "#f59e0b" },
-                                new Object[] { "Entertainment", "EXPENSE", "🎬", "#14b8a6" },
-                                new Object[] { "Education", "EXPENSE", "📚", "#3b82f6" },
-                                new Object[] { "Other", "EXPENSE", "📦", "#6b7280" });
+	// ─── DEFAULT CATEGORIES ──────────────────────────────────────────────────
 
-                List<CategoryEntity> entities = defaults.stream()
-                                .map(row -> CategoryEntity.builder()
-                                                .name((String) row[0])
-                                                .type((String) row[1])
-                                                .icon((String) row[2])
-                                                .color((String) row[3])
-                                                .profile(profile)
-                                                .build())
-                                .collect(Collectors.toList());
+	/**
+	 * Listens for UserRegisteredEvent and seeds default categories for the new user.
+	 * This decouples registration (ProfileService) from category creation (CategoryService).
+	 */
+	@EventListener
+	@Transactional
+	public void onUserRegistered(UserRegisteredEvent event) {
+		createDefaults(event.getProfile());
+	}
 
-                categoryRepository.saveAll(entities);
-        }
+	@Transactional
+	public void createDefaults(ProfileEntity profile) {
+			List<Object[]> defaults = List.of(
+					new Object[] { "Salary", "INCOME", "💼", "#22c55e" },
+					new Object[] { "Freelance", "INCOME", "🖥️", "#10b981" },
+					new Object[] { "Investments", "INCOME", "📈", "#06b6d4" },
+					new Object[] { "Other Income", "INCOME", "💰", "#6366f1" },
+					new Object[] { "Food", "EXPENSE", "🍔", "#ef4444" },
+					new Object[] { "Transport", "EXPENSE", "🚗", "#f97316" },
+					new Object[] { "Shopping", "EXPENSE", "🛍️", "#8b5cf6" },
+					new Object[] { "Health", "EXPENSE", "🏥", "#ec4899" },
+					new Object[] { "Utilities", "EXPENSE", "💡", "#f59e0b" },
+					new Object[] { "Entertainment", "EXPENSE", "🎬", "#14b8a6" },
+					new Object[] { "Education", "EXPENSE", "📚", "#3b82f6" },
+					new Object[] { "Other", "EXPENSE", "📦", "#6b7280" });
 
-        @Transactional
-        public void createDefaultsByEmail(String email) {
-                ProfileEntity profile = profileService.getProfileByEmail(email);
-                createDefaults(profile);
-        }
+			List<CategoryEntity> entities = defaults.stream()
+					.map(row -> CategoryEntity.builder()
+							.name((String) row[0])
+							.type((String) row[1])
+							.icon((String) row[2])
+							.color((String) row[3])
+							.profile(profile)
+							.build())
+					.collect(Collectors.toList());
 
-        // ─── HELPERS ─────────────────────────────────────────────────────────────
-        public CategoryResponse toResponse(CategoryEntity entity) {
+			categoryRepository.saveAll(entities);
+	}
+
+
+	// ─── HELPERS ─────────────────────────────────────────────────────────────
+	private CategoryResponse toResponse(CategoryEntity entity) {
                 List<SubCategoryResponse> subs = entity.getSubcategories().stream()
                                 .map(s -> SubCategoryResponse.builder()
                                                 .id(s.getId())

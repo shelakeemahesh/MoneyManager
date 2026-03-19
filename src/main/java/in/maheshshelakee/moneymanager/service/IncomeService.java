@@ -82,7 +82,7 @@ public class IncomeService {
         incomeRepository.delete(entity);
     }
 
-    public IncomeDTO toDTO(IncomeEntity entity) {
+    private IncomeDTO toDTO(IncomeEntity entity) {
         return IncomeDTO.builder()
                 .id(entity.getId())
                 .source(entity.getSource())

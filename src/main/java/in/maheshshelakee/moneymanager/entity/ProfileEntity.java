@@ -20,11 +20,13 @@ public class ProfileEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(nullable = false, length = 100)
     private String fullName;
 
     @Column(unique = true, nullable = false)
     private String email;
 
+    @Column(nullable = false)
     private String password;
 
     private String profileImageUrl;
@@ -38,7 +40,14 @@ public class ProfileEntity {
 
     private Boolean isActive;
 
+    /** Used only for email-based account activation. */
     private String activationToken;
+
+    /** Used only for password reset flow — separate from activationToken. */
+    private String resetToken;
+
+    /** Expiry timestamp for the password reset token (valid for 1 hour). */
+    private LocalDateTime resetTokenExpiresAt;
 
     @Enumerated(EnumType.STRING)
     private Role role;

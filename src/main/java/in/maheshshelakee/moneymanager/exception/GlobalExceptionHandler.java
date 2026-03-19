@@ -1,5 +1,6 @@
 package in.maheshshelakee.moneymanager.exception;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -12,6 +13,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -63,14 +65,16 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Handles ResponseStatusException (our explicit business errors)
+     * Handles ResponseStatusException (explicit business errors)
      */
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ErrorResponse> handleResponseStatus(ResponseStatusException ex) {
         ErrorResponse body = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .status(ex.getStatusCode().value())
-                .error(ex.getStatusCode().toString())
+                .error(HttpStatus.resolve(ex.getStatusCode().value()) != null
+                        ? HttpStatus.resolve(ex.getStatusCode().value()).getReasonPhrase()
+                        : ex.getStatusCode().toString())
                 .message(ex.getReason())
                 .build();
         return ResponseEntity.status(ex.getStatusCode()).body(body);
@@ -78,9 +82,11 @@ public class GlobalExceptionHandler {
 
     /**
      * Fallback — catches any unexpected runtime exception → 500
+     * Logs the full stack trace so it appears in Render logs.
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleAll(Exception ex) {
+        log.error("Unhandled exception: {}", ex.getMessage(), ex);
         ErrorResponse body = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.INTERNAL_SERVER_ERROR.value())

@@ -3,16 +3,19 @@ package in.maheshshelakee.moneymanager.service;
 import in.maheshshelakee.moneymanager.dto.*;
 import in.maheshshelakee.moneymanager.entity.ProfileEntity;
 import in.maheshshelakee.moneymanager.entity.UserStatus;
+import in.maheshshelakee.moneymanager.event.UserRegisteredEvent;
 import in.maheshshelakee.moneymanager.repository.ProfileRepository;
 import in.maheshshelakee.moneymanager.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Service
@@ -23,11 +26,12 @@ public class ProfileService {
     private final EmailService emailService;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Value("${app.base-url}")
     private String baseUrl;
 
-    // ─── REGISTER ────────────────────────────────────────────────────────────
+    // ─── REGISTER ─────────────────────────────────────────────────────────────
     @Transactional
     public ProfileDTO registerProfile(ProfileDTO profileDTO) {
         String email = profileDTO.getEmail().trim().toLowerCase();
@@ -46,23 +50,22 @@ public class ProfileService {
 
         newProfile = profileRepository.save(newProfile);
 
-        // NOTE: Default categories moved to controller (no circular dependency)
+        // Publish event so CategoryService seeds default categories
+        // (avoids circular dependency between ProfileService ↔ CategoryService)
+        eventPublisher.publishEvent(new UserRegisteredEvent(this, newProfile));
 
-        // Send activation email
         String activationLink = baseUrl + "/activate?token=" + newProfile.getActivationToken();
-
-        String subject = "Activate your Money Manager account";
-        String body = "Hi " + newProfile.getFullName() + ",\n\n"
-                + "Click the link below to activate your account:\n"
-                + activationLink + "\n\n"
-                + "– Money Manager Team";
-
-        emailService.sendEmail(newProfile.getEmail(), subject, body);
+        emailService.sendEmail(
+                newProfile.getEmail(),
+                "Activate your Money Manager account",
+                "Hi " + newProfile.getFullName() + ",\n\n"
+                        + "Click the link below to activate your account:\n"
+                        + activationLink + "\n\n– Money Manager Team");
 
         return toDTO(newProfile);
     }
 
-    // ─── ACTIVATE ────────────────────────────────────────────────────────────
+    // ─── ACTIVATE ─────────────────────────────────────────────────────────────
     @Transactional
     public String activateAccount(String token) {
         ProfileEntity profile = profileRepository.findByActivationToken(token)
@@ -76,11 +79,10 @@ public class ProfileService {
         profile.setIsActive(true);
         profile.setActivationToken(null);
         profileRepository.save(profile);
-
         return "Account activated successfully";
     }
 
-    // ─── LOGIN ───────────────────────────────────────────────────────────────
+    // ─── LOGIN ────────────────────────────────────────────────────────────────
     @Transactional(readOnly = true)
     public LoginResponse login(LoginRequest request) {
         String email = request.getEmail().trim().toLowerCase();
@@ -93,52 +95,60 @@ public class ProfileService {
         }
 
         if (profile.getStatus() == UserStatus.BANNED || profile.getStatus() == UserStatus.SUSPENDED) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Account suspended");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Account is " + profile.getStatus().name().toLowerCase());
         }
 
         if (!Boolean.TRUE.equals(profile.getIsActive())) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Account not activated");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                    "Account not activated. Please check your email.");
         }
 
-        String token = jwtUtil.generateToken(
-                email,
-                profile.getRole().name(),
-                profile.getStatus().name());
-
+        String token = jwtUtil.generateToken(email, profile.getRole().name(), profile.getStatus().name());
         return new LoginResponse(token, toDTO(profile));
     }
 
-    // ─── FORGOT PASSWORD ─────────────────────────────────────────────────────
+    // ─── FORGOT PASSWORD ──────────────────────────────────────────────────────
     @Transactional
     public void forgotPassword(ForgotPasswordRequest request) {
+        // Always respond the same way to prevent user enumeration attacks
         profileRepository.findByEmail(request.getEmail().trim().toLowerCase())
                 .ifPresent(profile -> {
                     String token = UUID.randomUUID().toString();
-                    profile.setActivationToken(token);
+                    // Use dedicated resetToken field — never reuse activationToken
+                    profile.setResetToken(token);
+                    profile.setResetTokenExpiresAt(LocalDateTime.now().plusHours(1));
                     profileRepository.save(profile);
 
                     String link = baseUrl + "/reset-password?token=" + token;
-
                     emailService.sendEmail(
                             profile.getEmail(),
-                            "Reset Password",
-                            "Click: " + link);
+                            "Reset your Money Manager password",
+                            "Click the link below to reset your password (valid for 1 hour):\n"
+                                    + link + "\n\nIf you didn't request this, ignore this email.");
                 });
     }
 
-    // ─── RESET PASSWORD ──────────────────────────────────────────────────────
+    // ─── RESET PASSWORD ───────────────────────────────────────────────────────
     @Transactional
     public void resetPassword(ResetPasswordRequest request) {
-        ProfileEntity profile = profileRepository.findByActivationToken(request.getToken())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid token"));
+        ProfileEntity profile = profileRepository.findByResetToken(request.getToken())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Invalid or expired reset token"));
+
+        if (profile.getResetTokenExpiresAt() == null
+                || profile.getResetTokenExpiresAt().isBefore(LocalDateTime.now())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Reset token has expired. Please request a new one.");
+        }
 
         profile.setPassword(passwordEncoder.encode(request.getNewPassword()));
-        profile.setActivationToken(null);
-
+        profile.setResetToken(null);
+        profile.setResetTokenExpiresAt(null);
         profileRepository.save(profile);
     }
 
-    // ─── HELPERS ─────────────────────────────────────────────────────────────
+    // ─── HELPERS ──────────────────────────────────────────────────────────────
     @Transactional(readOnly = true)
     public ProfileEntity getProfileByEmail(String email) {
         return profileRepository.findByEmail(email)

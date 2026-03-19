@@ -145,7 +145,7 @@ public class ExpenseService {
 
     // ─── HELPER: Entity → Response DTO ────────────────────────────────────────
 
-    public ExpenseResponse toResponse(ExpenseEntity entity) {
+    private ExpenseResponse toResponse(ExpenseEntity entity) {
         return ExpenseResponse.builder()
                 .id(entity.getId())
                 .title(entity.getTitle())
