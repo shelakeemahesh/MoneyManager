@@ -1,14 +1,14 @@
 package in.maheshshelakee.moneymanager.service;
 
 import in.maheshshelakee.moneymanager.dto.*;
+import in.maheshshelakee.moneymanager.entity.CategoryEntity;
 import in.maheshshelakee.moneymanager.entity.ProfileEntity;
 import in.maheshshelakee.moneymanager.entity.UserStatus;
+import in.maheshshelakee.moneymanager.repository.CategoryRepository;
 import in.maheshshelakee.moneymanager.repository.ProfileRepository;
 import in.maheshshelakee.moneymanager.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -16,7 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -26,16 +28,7 @@ public class ProfileService {
     private final EmailService emailService;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
-
-    /**
-     * @Lazy breaks the circular dependency:
-     *   ProfileService → CategoryService → ProfileRepository  ✅ (no cycle)
-     * Without @Lazy, Spring would try to create CategoryService before ProfileService
-     * is ready (since CategoryService needs ProfileRepository which needs the context ready).
-     */
-    @Lazy
-    @Autowired
-    private CategoryService categoryService;
+    private final CategoryRepository categoryRepository;
 
     @Value("${app.base-url}")
     private String baseUrl;
@@ -59,9 +52,8 @@ public class ProfileService {
 
         newProfile = profileRepository.save(newProfile);
 
-        // Seed default categories for the new user.
-        // @Lazy on categoryService means Spring creates a proxy here — no startup cycle.
-        categoryService.createDefaults(newProfile);
+        // Seed default categories directly via repository — no CategoryService dependency
+        createDefaultCategories(newProfile);
 
         String activationLink = baseUrl + "/activate?token=" + newProfile.getActivationToken();
         emailService.sendEmail(
@@ -172,5 +164,34 @@ public class ProfileService {
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
                 .build();
+    }
+
+    // ─── DEFAULT CATEGORIES (inlined to avoid circular dependency with CategoryService) ─
+    private void createDefaultCategories(ProfileEntity profile) {
+        List<Object[]> defaults = List.of(
+                new Object[]{"Salary",        "INCOME",  "💼", "#22c55e"},
+                new Object[]{"Freelance",     "INCOME",  "🖥️", "#10b981"},
+                new Object[]{"Investments",   "INCOME",  "📈", "#06b6d4"},
+                new Object[]{"Other Income",  "INCOME",  "💰", "#6366f1"},
+                new Object[]{"Food",          "EXPENSE", "🍔", "#ef4444"},
+                new Object[]{"Transport",     "EXPENSE", "🚗", "#f97316"},
+                new Object[]{"Shopping",      "EXPENSE", "🛍️", "#8b5cf6"},
+                new Object[]{"Health",        "EXPENSE", "🏥", "#ec4899"},
+                new Object[]{"Utilities",     "EXPENSE", "💡", "#f59e0b"},
+                new Object[]{"Entertainment", "EXPENSE", "🎬", "#14b8a6"},
+                new Object[]{"Education",     "EXPENSE", "📚", "#3b82f6"},
+                new Object[]{"Other",         "EXPENSE", "📦", "#6b7280"});
+
+        List<CategoryEntity> entities = defaults.stream()
+                .map(row -> CategoryEntity.builder()
+                        .name((String) row[0])
+                        .type((String) row[1])
+                        .icon((String) row[2])
+                        .color((String) row[3])
+                        .profile(profile)
+                        .build())
+                .collect(Collectors.toList());
+
+        categoryRepository.saveAll(entities);
     }
 }
