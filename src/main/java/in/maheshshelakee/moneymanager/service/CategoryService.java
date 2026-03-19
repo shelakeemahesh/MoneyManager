@@ -5,11 +5,9 @@ import in.maheshshelakee.moneymanager.dto.CategoryResponse;
 import in.maheshshelakee.moneymanager.dto.SubCategoryResponse;
 import in.maheshshelakee.moneymanager.entity.CategoryEntity;
 import in.maheshshelakee.moneymanager.entity.ProfileEntity;
-import in.maheshshelakee.moneymanager.event.UserRegisteredEvent;
 import in.maheshshelakee.moneymanager.repository.CategoryRepository;
 import in.maheshshelakee.moneymanager.repository.ProfileRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.event.EventListener;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,171 +20,147 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class CategoryService {
 
-        // Use ProfileRepository directly instead of ProfileService to avoid a
-        // circular dependency: CategoryService → ProfileService → ApplicationEventPublisher → CategoryService
-        private final CategoryRepository categoryRepository;
-        private final ProfileRepository profileRepository;
+    // ProfileRepository used directly (not ProfileService) to avoid circular dependency:
+    // ProfileService --@Lazy--> CategoryService --> ProfileRepository  ✅
+    private final CategoryRepository categoryRepository;
+    private final ProfileRepository profileRepository;
 
-        // ─── HELPERS: profile lookup ──────────────────────────────────────────────
-        private ProfileEntity getProfile(String email) {
-                return profileRepository.findByEmail(email)
-                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                                                "User not found: " + email));
+    // ─── Profile lookup helper ────────────────────────────────────────────────
+    private ProfileEntity getProfile(String email) {
+        return profileRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "User not found: " + email));
+    }
+
+    // ─── READ ─────────────────────────────────────────────────────────────────
+    @Transactional(readOnly = true)
+    public List<CategoryResponse> getAll(String email) {
+        ProfileEntity profile = getProfile(email);
+        return categoryRepository.findByProfileWithSubcategories(profile)
+                .stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    // ─── CREATE ───────────────────────────────────────────────────────────────
+    @Transactional
+    public CategoryResponse create(CategoryRequest request, String email) {
+        ProfileEntity profile = getProfile(email);
+        String normalizedType = request.getType().toUpperCase();
+
+        if (categoryRepository.existsByNameAndTypeAndProfile(
+                request.getName().trim(), normalizedType, profile)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Category '" + request.getName() + "' already exists for type " + normalizedType);
         }
 
-        // ─── READ ────────────────────────────────────────────────────────────────
-        @Transactional(readOnly = true)
-        public List<CategoryResponse> getAll(String email) {
-                ProfileEntity profile = getProfile(email);
-                return categoryRepository.findByProfileWithSubcategories(profile)
-                                .stream()
-                                .map(this::toResponse)
-                                .collect(Collectors.toList());
+        CategoryEntity entity = CategoryEntity.builder()
+                .name(request.getName().trim())
+                .type(normalizedType)
+                .icon(request.getIcon() != null && !request.getIcon().isBlank() ? request.getIcon() : "📁")
+                .color(request.getColor() != null && !request.getColor().isBlank() ? request.getColor() : "#6366f1")
+                .profile(profile)
+                .build();
+
+        return toResponse(categoryRepository.save(entity));
+    }
+
+    // ─── UPDATE ───────────────────────────────────────────────────────────────
+    @Transactional
+    public CategoryResponse update(Long id, CategoryRequest request, String email) {
+        ProfileEntity profile = getProfile(email);
+
+        CategoryEntity entity = categoryRepository.findByIdAndProfile(id, profile)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Category not found"));
+
+        String normalizedType = request.getType().toUpperCase();
+        boolean nameChanged = !entity.getName().equalsIgnoreCase(request.getName().trim())
+                || !entity.getType().equalsIgnoreCase(normalizedType);
+
+        if (nameChanged && categoryRepository.existsByNameAndTypeAndProfile(
+                request.getName().trim(), normalizedType, profile)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Category '" + request.getName() + "' already exists for type " + normalizedType);
         }
 
-        // ─── CREATE ──────────────────────────────────────────────────────────────
-        @Transactional
-        public CategoryResponse create(CategoryRequest request, String email) {
-                ProfileEntity profile = getProfile(email);
-                String normalizedType = request.getType().toUpperCase();
+        entity.setName(request.getName().trim());
+        entity.setType(normalizedType);
+        if (request.getIcon() != null && !request.getIcon().isBlank()) entity.setIcon(request.getIcon());
+        if (request.getColor() != null && !request.getColor().isBlank()) entity.setColor(request.getColor());
 
-                if (categoryRepository.existsByNameAndTypeAndProfile(
-                                request.getName().trim(), normalizedType, profile)) {
-                        throw new ResponseStatusException(HttpStatus.CONFLICT,
-                                        "Category '" + request.getName() + "' already exists for type "
-                                                        + normalizedType);
-                }
+        return toResponse(categoryRepository.save(entity));
+    }
 
-                CategoryEntity entity = CategoryEntity.builder()
-                                .name(request.getName().trim())
-                                .type(normalizedType)
-                                .icon(request.getIcon() != null && !request.getIcon().isBlank() ? request.getIcon()
-                                                : "📁")
-                                .color(request.getColor() != null && !request.getColor().isBlank() ? request.getColor()
-                                                : "#6366f1")
-                                .profile(profile)
-                                .build();
+    // ─── DELETE ───────────────────────────────────────────────────────────────
+    @Transactional
+    public void delete(Long id, String email) {
+        ProfileEntity profile = getProfile(email);
+        CategoryEntity entity = categoryRepository.findByIdAndProfile(id, profile)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Category not found"));
+        categoryRepository.delete(entity);
+    }
 
-                return toResponse(categoryRepository.save(entity));
-        }
+    // ─── DEFAULT CATEGORIES (called by ProfileService on registration) ────────
+    @Transactional
+    public void createDefaults(ProfileEntity profile) {
+        List<Object[]> defaults = List.of(
+                new Object[]{"Salary",        "INCOME",  "💼", "#22c55e"},
+                new Object[]{"Freelance",     "INCOME",  "🖥️", "#10b981"},
+                new Object[]{"Investments",   "INCOME",  "📈", "#06b6d4"},
+                new Object[]{"Other Income",  "INCOME",  "💰", "#6366f1"},
+                new Object[]{"Food",          "EXPENSE", "🍔", "#ef4444"},
+                new Object[]{"Transport",     "EXPENSE", "🚗", "#f97316"},
+                new Object[]{"Shopping",      "EXPENSE", "🛍️", "#8b5cf6"},
+                new Object[]{"Health",        "EXPENSE", "🏥", "#ec4899"},
+                new Object[]{"Utilities",     "EXPENSE", "💡", "#f59e0b"},
+                new Object[]{"Entertainment", "EXPENSE", "🎬", "#14b8a6"},
+                new Object[]{"Education",     "EXPENSE", "📚", "#3b82f6"},
+                new Object[]{"Other",         "EXPENSE", "📦", "#6b7280"});
 
-        // ─── UPDATE ──────────────────────────────────────────────────────────────
-        @Transactional
-        public CategoryResponse update(Long id, CategoryRequest request, String email) {
-                ProfileEntity profile = getProfile(email);
+        List<CategoryEntity> entities = defaults.stream()
+                .map(row -> CategoryEntity.builder()
+                        .name((String) row[0])
+                        .type((String) row[1])
+                        .icon((String) row[2])
+                        .color((String) row[3])
+                        .profile(profile)
+                        .build())
+                .collect(Collectors.toList());
 
-                CategoryEntity entity = categoryRepository.findByIdAndProfile(id, profile)
-                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                                                "Category not found"));
+        categoryRepository.saveAll(entities);
+    }
 
-                String normalizedType = request.getType().toUpperCase();
+    // ─── GET BY ID + EMAIL ────────────────────────────────────────────────────
+    @Transactional(readOnly = true)
+    public CategoryEntity getCategoryByIdAndEmail(Long id, String email) {
+        ProfileEntity profile = getProfile(email);
+        return categoryRepository.findByIdAndProfile(id, profile)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Category not found"));
+    }
 
-                boolean nameChanged = !entity.getName().equalsIgnoreCase(request.getName().trim())
-                                || !entity.getType().equalsIgnoreCase(normalizedType);
+    // ─── INTERNAL MAPPER ──────────────────────────────────────────────────────
+    private CategoryResponse toResponse(CategoryEntity entity) {
+        List<SubCategoryResponse> subs = entity.getSubcategories().stream()
+                .map(s -> SubCategoryResponse.builder()
+                        .id(s.getId())
+                        .name(s.getName())
+                        .icon(s.getIcon())
+                        .categoryId(entity.getId())
+                        .categoryName(entity.getName())
+                        .createdAt(s.getCreatedAt())
+                        .build())
+                .collect(Collectors.toList());
 
-                if (nameChanged && categoryRepository.existsByNameAndTypeAndProfile(
-                                request.getName().trim(), normalizedType, profile)) {
-                        throw new ResponseStatusException(HttpStatus.CONFLICT,
-                                        "Category '" + request.getName() + "' already exists for type "
-                                                        + normalizedType);
-                }
-
-                entity.setName(request.getName().trim());
-                entity.setType(normalizedType);
-
-                if (request.getIcon() != null && !request.getIcon().isBlank())
-                        entity.setIcon(request.getIcon());
-
-                if (request.getColor() != null && !request.getColor().isBlank())
-                        entity.setColor(request.getColor());
-
-                return toResponse(categoryRepository.save(entity));
-        }
-
-        // ─── DELETE ──────────────────────────────────────────────────────────────
-        @Transactional
-        public void delete(Long id, String email) {
-                ProfileEntity profile = getProfile(email);
-
-                CategoryEntity entity = categoryRepository.findByIdAndProfile(id, profile)
-                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                                                "Category not found"));
-
-                categoryRepository.delete(entity);
-        }
-
-        // ─── DEFAULT CATEGORIES ──────────────────────────────────────────────────
-
-        /**
-         * Listens for UserRegisteredEvent and seeds default categories for the new user.
-         * Using ProfileRepository (not ProfileService) here to break the circular dep.
-         */
-        @EventListener
-        @Transactional
-        public void onUserRegistered(UserRegisteredEvent event) {
-                createDefaults(event.getProfile());
-        }
-
-        @Transactional
-        public void createDefaults(ProfileEntity profile) {
-                List<Object[]> defaults = List.of(
-                                new Object[] { "Salary", "INCOME", "💼", "#22c55e" },
-                                new Object[] { "Freelance", "INCOME", "🖥️", "#10b981" },
-                                new Object[] { "Investments", "INCOME", "📈", "#06b6d4" },
-                                new Object[] { "Other Income", "INCOME", "💰", "#6366f1" },
-                                new Object[] { "Food", "EXPENSE", "🍔", "#ef4444" },
-                                new Object[] { "Transport", "EXPENSE", "🚗", "#f97316" },
-                                new Object[] { "Shopping", "EXPENSE", "🛍️", "#8b5cf6" },
-                                new Object[] { "Health", "EXPENSE", "🏥", "#ec4899" },
-                                new Object[] { "Utilities", "EXPENSE", "💡", "#f59e0b" },
-                                new Object[] { "Entertainment", "EXPENSE", "🎬", "#14b8a6" },
-                                new Object[] { "Education", "EXPENSE", "📚", "#3b82f6" },
-                                new Object[] { "Other", "EXPENSE", "📦", "#6b7280" });
-
-                List<CategoryEntity> entities = defaults.stream()
-                                .map(row -> CategoryEntity.builder()
-                                                .name((String) row[0])
-                                                .type((String) row[1])
-                                                .icon((String) row[2])
-                                                .color((String) row[3])
-                                                .profile(profile)
-                                                .build())
-                                .collect(Collectors.toList());
-
-                categoryRepository.saveAll(entities);
-        }
-
-        // ─── HELPERS ─────────────────────────────────────────────────────────────
-        private CategoryResponse toResponse(CategoryEntity entity) {
-                List<SubCategoryResponse> subs = entity.getSubcategories().stream()
-                                .map(s -> SubCategoryResponse.builder()
-                                                .id(s.getId())
-                                                .name(s.getName())
-                                                .icon(s.getIcon())
-                                                .categoryId(entity.getId())
-                                                .categoryName(entity.getName())
-                                                .createdAt(s.getCreatedAt())
-                                                .build())
-                                .collect(Collectors.toList());
-
-                return CategoryResponse.builder()
-                                .id(entity.getId())
-                                .name(entity.getName())
-                                .type(entity.getType())
-                                .icon(entity.getIcon())
-                                .color(entity.getColor())
-                                .subcategoryCount(subs.size())
-                                .subcategories(subs)
-                                .createdAt(entity.getCreatedAt())
-                                .updatedAt(entity.getUpdatedAt())
-                                .build();
-        }
-
-        @Transactional(readOnly = true)
-        public CategoryEntity getCategoryByIdAndEmail(Long id, String email) {
-                ProfileEntity profile = getProfile(email);
-                return categoryRepository.findByIdAndProfile(id, profile)
-                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                                                "Category not found"));
-        }
+        return CategoryResponse.builder()
+                .id(entity.getId())
+                .name(entity.getName())
+                .type(entity.getType())
+                .icon(entity.getIcon())
+                .color(entity.getColor())
+                .subcategoryCount(subs.size())
+                .subcategories(subs)
+                .createdAt(entity.getCreatedAt())
+                .updatedAt(entity.getUpdatedAt())
+                .build();
+    }
 }
