@@ -6,6 +6,7 @@ import in.maheshshelakee.moneymanager.dto.SubCategoryResponse;
 import in.maheshshelakee.moneymanager.entity.CategoryEntity;
 import in.maheshshelakee.moneymanager.entity.ProfileEntity;
 import in.maheshshelakee.moneymanager.repository.CategoryRepository;
+import in.maheshshelakee.moneymanager.repository.ProfileRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -21,12 +22,12 @@ import java.util.stream.Collectors;
 public class CategoryService {
 
     private final CategoryRepository categoryRepository;
-    private final ProfileService profileService;
+    private final ProfileRepository profileRepository;
 
     // ─── READ ──────────────────────────────────────────────────────────────────
     @Transactional(readOnly = true)
     public List<CategoryResponse> getAll(String email) {
-        ProfileEntity profile = profileService.getProfileByEmail(email);
+        ProfileEntity profile = getProfile(email);
         return categoryRepository.findByProfileWithSubcategories(profile)
                 .stream()
                 .map(this::toResponse)
@@ -36,10 +37,13 @@ public class CategoryService {
     // ─── CREATE ─────────────────────────────────────────────────────────────────
     @Transactional
     public CategoryResponse create(CategoryRequest request, String email) {
-        ProfileEntity profile = profileService.getProfileByEmail(email);
+        ProfileEntity profile = getProfile(email);
         String normalizedType = request.getType().toUpperCase();
 
-        if (categoryRepository.existsByNameAndTypeAndProfile(request.getName().trim(), normalizedType, profile)) {
+        if (categoryRepository.existsByNameAndTypeAndProfile(
+                request.getName().trim(),
+                normalizedType,
+                profile)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Category '" + request.getName() + "' already exists for type " + normalizedType);
         }
@@ -47,8 +51,10 @@ public class CategoryService {
         CategoryEntity entity = CategoryEntity.builder()
                 .name(request.getName().trim())
                 .type(normalizedType)
-                .icon(request.getIcon() != null && !request.getIcon().isBlank() ? request.getIcon() : "📁")
-                .color(request.getColor() != null && !request.getColor().isBlank() ? request.getColor() : "#6366f1")
+                .icon(request.getIcon() != null && !request.getIcon().isBlank()
+                        ? request.getIcon() : "📁")
+                .color(request.getColor() != null && !request.getColor().isBlank()
+                        ? request.getColor() : "#6366f1")
                 .profile(profile)
                 .build();
 
@@ -58,15 +64,20 @@ public class CategoryService {
     // ─── UPDATE ─────────────────────────────────────────────────────────────────
     @Transactional
     public CategoryResponse update(Long id, CategoryRequest request, String email) {
-        ProfileEntity profile = profileService.getProfileByEmail(email);
+        ProfileEntity profile = getProfile(email);
+
         CategoryEntity entity = categoryRepository.findByIdAndProfile(id, profile)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Category not found"));
 
         String normalizedType = request.getType().toUpperCase();
 
-        boolean nameChanged = !entity.getName().equalsIgnoreCase(request.getName().trim())
-                || !entity.getType().equalsIgnoreCase(normalizedType);
-        if (nameChanged && categoryRepository.existsByNameAndTypeAndProfile(request.getName().trim(), normalizedType,
+        boolean nameChanged =
+                !entity.getName().equalsIgnoreCase(request.getName().trim()) ||
+                        !entity.getType().equalsIgnoreCase(normalizedType);
+
+        if (nameChanged && categoryRepository.existsByNameAndTypeAndProfile(
+                request.getName().trim(),
+                normalizedType,
                 profile)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Category '" + request.getName() + "' already exists for type " + normalizedType);
@@ -74,10 +85,14 @@ public class CategoryService {
 
         entity.setName(request.getName().trim());
         entity.setType(normalizedType);
-        if (request.getIcon() != null && !request.getIcon().isBlank())
+
+        if (request.getIcon() != null && !request.getIcon().isBlank()) {
             entity.setIcon(request.getIcon());
-        if (request.getColor() != null && !request.getColor().isBlank())
+        }
+
+        if (request.getColor() != null && !request.getColor().isBlank()) {
             entity.setColor(request.getColor());
+        }
 
         return toResponse(categoryRepository.save(entity));
     }
@@ -85,18 +100,18 @@ public class CategoryService {
     // ─── DELETE ─────────────────────────────────────────────────────────────────
     @Transactional
     public void delete(Long id, String email) {
-        ProfileEntity profile = profileService.getProfileByEmail(email);
+        ProfileEntity profile = getProfile(email);
+
         CategoryEntity entity = categoryRepository.findByIdAndProfile(id, profile)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Category not found"));
+
         categoryRepository.delete(entity);
     }
 
-    // ─── DEFAULT CATEGORIES (called on user signup) ──────────────────────────
-    // FIX: REQUIRES_NEW so that a DB failure here does not silently roll back the
-    //      outer registerProfile() transaction. The caller receives a clear error
-    //      instead of a silent rollback with no feedback.
+    // ─── DEFAULT CATEGORIES ─────────────────────────────────────────────────────
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void createDefaults(ProfileEntity profile) {
+
         List<Object[]> defaults = List.of(
                 new Object[] { "Salary",        "INCOME",  "💼", "#22c55e" },
                 new Object[] { "Freelance",     "INCOME",  "🖥️", "#10b981" },
@@ -109,21 +124,33 @@ public class CategoryService {
                 new Object[] { "Utilities",     "EXPENSE", "💡", "#f59e0b" },
                 new Object[] { "Entertainment", "EXPENSE", "🎬", "#14b8a6" },
                 new Object[] { "Education",     "EXPENSE", "📚", "#3b82f6" },
-                new Object[] { "Other",         "EXPENSE", "📦", "#6b7280" });
+                new Object[] { "Other",         "EXPENSE", "📦", "#6b7280" }
+        );
 
-        List<CategoryEntity> entities = defaults.stream().map(row -> CategoryEntity.builder()
-                .name((String) row[0])
-                .type((String) row[1])
-                .icon((String) row[2])
-                .color((String) row[3])
-                .profile(profile)
-                .build()).collect(Collectors.toList());
+        List<CategoryEntity> entities = defaults.stream()
+                .map(row -> CategoryEntity.builder()
+                        .name((String) row[0])
+                        .type((String) row[1])
+                        .icon((String) row[2])
+                        .color((String) row[3])
+                        .profile(profile)
+                        .build())
+                .collect(Collectors.toList());
+
         categoryRepository.saveAll(entities);
     }
 
     // ─── HELPERS ────────────────────────────────────────────────────────────────
+    private ProfileEntity getProfile(String email) {
+        return profileRepository.findByEmail(email)
+                .orElseThrow(() ->
+                        new ResponseStatusException(HttpStatus.NOT_FOUND, "Profile not found"));
+    }
+
     public CategoryResponse toResponse(CategoryEntity entity) {
-        List<SubCategoryResponse> subs = entity.getSubcategories().stream()
+
+        List<SubCategoryResponse> subs = entity.getSubcategories()
+                .stream()
                 .map(s -> SubCategoryResponse.builder()
                         .id(s.getId())
                         .name(s.getName())
@@ -149,8 +176,10 @@ public class CategoryService {
 
     @Transactional(readOnly = true)
     public CategoryEntity getCategoryByIdAndEmail(Long id, String email) {
-        ProfileEntity profile = profileService.getProfileByEmail(email);
+        ProfileEntity profile = getProfile(email);
+
         return categoryRepository.findByIdAndProfile(id, profile)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Category not found"));
+                .orElseThrow(() ->
+                        new ResponseStatusException(HttpStatus.NOT_FOUND, "Category not found"));
     }
 }
