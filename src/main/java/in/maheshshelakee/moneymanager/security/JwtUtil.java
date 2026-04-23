@@ -2,14 +2,27 @@ package in.maheshshelakee.moneymanager.security;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.util.Date;
 
+/**
+ * JWT utility for token generation, parsing, and validation.
+ * <p>
+ * Uses HMAC-SHA256 which requires a secret key of at least 32 bytes (256 bits).
+ * The secret and expiration are injected from application.properties and validated
+ * at startup via {@link #validateConfiguration()}.
+ */
+@Slf4j
 @Component
 public class JwtUtil {
+
+    private static final int MIN_SECRET_LENGTH = 32;
 
     @Value("${app.jwt.secret}")
     private String secret;
@@ -17,8 +30,40 @@ public class JwtUtil {
     @Value("${app.jwt.expiration-ms}")
     private long expirationMs;
 
-    private Key getSigningKey() {
-        return Keys.hmacShaKeyFor(secret.getBytes());
+    private Key signingKey;
+
+    /**
+     * Fail-fast validation — if the secret is too short or expiration is invalid,
+     * the app crashes immediately at startup with a clear error message instead of
+     * failing silently on the first token operation at runtime.
+     */
+    @PostConstruct
+    void validateConfiguration() {
+        if (secret == null || secret.isBlank()) {
+            throw new IllegalStateException(
+                    "JWT secret (app.jwt.secret) is not configured. "
+                    + "Set APP_JWT_SECRET environment variable with a minimum of "
+                    + MIN_SECRET_LENGTH + " characters.");
+        }
+
+        byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
+        if (keyBytes.length < MIN_SECRET_LENGTH) {
+            throw new IllegalStateException(
+                    "JWT secret is too short (" + keyBytes.length + " bytes). "
+                    + "HMAC-SHA256 requires at least " + MIN_SECRET_LENGTH + " bytes. "
+                    + "Current value has " + keyBytes.length + " bytes.");
+        }
+
+        if (expirationMs <= 0) {
+            throw new IllegalStateException(
+                    "JWT expiration (app.jwt.expiration-ms) must be positive, got: " + expirationMs);
+        }
+
+        // Pre-compute the signing key once (immutable after init)
+        this.signingKey = Keys.hmacShaKeyFor(keyBytes);
+
+        log.info("JwtUtil initialized — secret length: {} bytes, expiration: {} ms",
+                keyBytes.length, expirationMs);
     }
 
     public String generateToken(String email, String role, String status) {
@@ -28,43 +73,39 @@ public class JwtUtil {
                 .claim("status", status)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + expirationMs))
-                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .signWith(signingKey, SignatureAlgorithm.HS256)
                 .compact();
     }
 
     public String extractEmail(String token) {
-        return extractClaim(token, "sub");
+        return extractClaims(token).getSubject();
     }
 
     public String extractRole(String token) {
-        return extractClaim(token, "role");
+        return extractClaims(token).get("role", String.class);
     }
 
     public String extractStatus(String token) {
-        return extractClaim(token, "status");
-    }
-
-    private String extractClaim(String token, String claimKey) {
-        Claims claims = Jwts.parserBuilder()
-                .setSigningKey(getSigningKey())
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
-        if ("sub".equals(claimKey)) {
-            return claims.getSubject();
-        }
-        return claims.get(claimKey, String.class);
+        return extractClaims(token).get("status", String.class);
     }
 
     public boolean isTokenValid(String token) {
         try {
-            Jwts.parserBuilder()
-                    .setSigningKey(getSigningKey())
-                    .build()
-                    .parseClaimsJws(token);
+            extractClaims(token);
             return true;
         } catch (JwtException | IllegalArgumentException e) {
             return false;
         }
+    }
+
+    /**
+     * Single parsing method — avoids recreating the parser on every call.
+     */
+    private Claims extractClaims(String token) {
+        return Jwts.parserBuilder()
+                .setSigningKey(signingKey)
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
     }
 }
