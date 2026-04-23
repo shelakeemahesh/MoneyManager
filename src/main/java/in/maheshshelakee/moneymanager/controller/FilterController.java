@@ -1,5 +1,6 @@
 package in.maheshshelakee.moneymanager.controller;
 
+import in.maheshshelakee.moneymanager.dto.ApiResponse;
 import in.maheshshelakee.moneymanager.dto.FilterResultDTO;
 import in.maheshshelakee.moneymanager.service.FilterService;
 import in.maheshshelakee.moneymanager.util.SecurityUtils;
@@ -22,7 +23,7 @@ public class FilterController {
     private final FilterService filterService;
 
     @GetMapping
-    public ResponseEntity<List<FilterResultDTO>> filter(
+    public ResponseEntity<ApiResponse<List<FilterResultDTO>>> filter(
             @RequestParam(defaultValue = "Income") String type,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
@@ -32,6 +33,6 @@ public class FilterController {
 
         List<FilterResultDTO> results = filterService.filter(
                 SecurityUtils.getCurrentUserEmail(), type, startDate, endDate, sortField, sortOrder, search);
-        return ResponseEntity.ok(results);
+        return ResponseEntity.ok(ApiResponse.success(results));
     }
 }

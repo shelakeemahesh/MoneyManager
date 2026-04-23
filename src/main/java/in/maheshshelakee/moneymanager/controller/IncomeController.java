@@ -1,5 +1,6 @@
 package in.maheshshelakee.moneymanager.controller;
 
+import in.maheshshelakee.moneymanager.dto.ApiResponse;
 import in.maheshshelakee.moneymanager.dto.IncomeDTO;
 import in.maheshshelakee.moneymanager.service.IncomeService;
 import in.maheshshelakee.moneymanager.util.SecurityUtils;
@@ -19,19 +20,23 @@ public class IncomeController {
     private final IncomeService incomeService;
 
     @GetMapping
-    public ResponseEntity<List<IncomeDTO>> getAll() {
-        return ResponseEntity.ok(incomeService.getAll(SecurityUtils.getCurrentUserEmail()));
+    public ResponseEntity<ApiResponse<List<IncomeDTO>>> getAll() {
+        return ResponseEntity.ok(ApiResponse.success(
+                incomeService.getAll(SecurityUtils.getCurrentUserEmail())));
     }
 
     @PostMapping
-    public ResponseEntity<IncomeDTO> add(@Valid @RequestBody IncomeDTO dto) {
+    public ResponseEntity<ApiResponse<IncomeDTO>> add(@Valid @RequestBody IncomeDTO dto) {
+        IncomeDTO created = incomeService.add(dto, SecurityUtils.getCurrentUserEmail());
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(incomeService.add(dto, SecurityUtils.getCurrentUserEmail()));
+                .body(ApiResponse.success(created, "Income added successfully"));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<IncomeDTO> update(@PathVariable Long id, @Valid @RequestBody IncomeDTO dto) {
-        return ResponseEntity.ok(incomeService.update(id, dto, SecurityUtils.getCurrentUserEmail()));
+    public ResponseEntity<ApiResponse<IncomeDTO>> update(@PathVariable Long id,
+            @Valid @RequestBody IncomeDTO dto) {
+        return ResponseEntity.ok(ApiResponse.success(
+                incomeService.update(id, dto, SecurityUtils.getCurrentUserEmail())));
     }
 
     @DeleteMapping("/{id}")

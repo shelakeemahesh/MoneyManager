@@ -3,7 +3,9 @@ package in.maheshshelakee.moneymanager.exception;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -79,6 +81,37 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handles Spring Security AccessDeniedException → 403 FORBIDDEN.
+     * Without this handler, Spring returns an HTML error page instead of structured JSON.
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex) {
+        ErrorResponse body = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.FORBIDDEN.value())
+                .error("Forbidden")
+                .message("You do not have permission to access this resource")
+                .build();
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
+    }
+
+    /**
+     * Handles unsupported HTTP methods → 405 METHOD NOT ALLOWED.
+     * Returns structured JSON with the list of supported methods.
+     */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleMethodNotAllowed(HttpRequestMethodNotSupportedException ex) {
+        ErrorResponse body = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.METHOD_NOT_ALLOWED.value())
+                .error("Method Not Allowed")
+                .message("HTTP method '" + ex.getMethod() + "' is not supported. Supported: "
+                        + String.join(", ", ex.getSupportedMethods() != null ? ex.getSupportedMethods() : new String[]{}))
+                .build();
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(body);
+    }
+
+    /**
      * Fallback — catches any unexpected runtime exception → 500
      * FIX: Added log.error so that the full stack trace is visible in logs.
      *      Previously the exception was silently swallowed and only a generic
@@ -96,3 +129,4 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
     }
 }
+

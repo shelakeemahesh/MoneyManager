@@ -1,5 +1,6 @@
 package in.maheshshelakee.moneymanager.controller;
 
+import in.maheshshelakee.moneymanager.dto.ApiResponse;
 import in.maheshshelakee.moneymanager.dto.SubCategoryRequest;
 import in.maheshshelakee.moneymanager.dto.SubCategoryResponse;
 import in.maheshshelakee.moneymanager.service.SubCategoryService;
@@ -20,14 +21,18 @@ public class SubCategoryController {
     private final SubCategoryService subCategoryService;
 
     @PostMapping
-    public ResponseEntity<SubCategoryResponse> create(@Valid @RequestBody SubCategoryRequest request) {
+    public ResponseEntity<ApiResponse<SubCategoryResponse>> create(
+            @Valid @RequestBody SubCategoryRequest request) {
+        SubCategoryResponse created = subCategoryService.create(request, SecurityUtils.getCurrentUserEmail());
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(subCategoryService.create(request, SecurityUtils.getCurrentUserEmail()));
+                .body(ApiResponse.success(created, "Subcategory created successfully"));
     }
 
     @GetMapping("/{categoryId}")
-    public ResponseEntity<List<SubCategoryResponse>> getByCategoryId(@PathVariable Long categoryId) {
-        return ResponseEntity.ok(subCategoryService.getByCategoryId(categoryId, SecurityUtils.getCurrentUserEmail()));
+    public ResponseEntity<ApiResponse<List<SubCategoryResponse>>> getByCategoryId(
+            @PathVariable Long categoryId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                subCategoryService.getByCategoryId(categoryId, SecurityUtils.getCurrentUserEmail())));
     }
 
     @DeleteMapping("/{id}")

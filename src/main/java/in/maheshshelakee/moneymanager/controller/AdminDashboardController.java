@@ -1,6 +1,6 @@
 package in.maheshshelakee.moneymanager.controller;
 
-import in.maheshshelakee.moneymanager.dto.AdminStatsResponse;
+import in.maheshshelakee.moneymanager.dto.AdminDashboardResponse;
 import in.maheshshelakee.moneymanager.dto.ApiResponse;
 import in.maheshshelakee.moneymanager.service.AdminService;
 import lombok.RequiredArgsConstructor;
@@ -11,21 +11,20 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Controller for system-wide user statistics.
- * Delegates to AdminService; returns typed AdminStatsResponse
- * instead of raw Map&lt;String, Object&gt;.
+ * Dedicated controller for the admin dashboard overview.
+ * Separated from user-management to maintain single-responsibility.
  */
 @RestController
-@RequestMapping("/admin/stats")
+@RequestMapping("/admin/dashboard")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('ADMIN')")
-public class AdminStatsController {
+public class AdminDashboardController {
 
     private final AdminService adminService;
 
     @GetMapping
-    public ResponseEntity<ApiResponse<AdminStatsResponse>> getSystemStats() {
-        AdminStatsResponse stats = adminService.getSystemStats();
+    public ResponseEntity<ApiResponse<AdminDashboardResponse>> getDashboardStats() {
+        AdminDashboardResponse stats = adminService.getDashboardStats();
         return ResponseEntity.ok(ApiResponse.success(stats));
     }
 }

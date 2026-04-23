@@ -1,5 +1,6 @@
 package in.maheshshelakee.moneymanager.controller;
 
+import in.maheshshelakee.moneymanager.dto.ApiResponse;
 import in.maheshshelakee.moneymanager.dto.CategoryRequest;
 import in.maheshshelakee.moneymanager.dto.CategoryResponse;
 import in.maheshshelakee.moneymanager.service.CategoryService;
@@ -20,20 +21,23 @@ public class CategoryController {
     private final CategoryService categoryService;
 
     @GetMapping
-    public ResponseEntity<List<CategoryResponse>> getAll() {
-        return ResponseEntity.ok(categoryService.getAll(SecurityUtils.getCurrentUserEmail()));
+    public ResponseEntity<ApiResponse<List<CategoryResponse>>> getAll() {
+        return ResponseEntity.ok(ApiResponse.success(
+                categoryService.getAll(SecurityUtils.getCurrentUserEmail())));
     }
 
     @PostMapping
-    public ResponseEntity<CategoryResponse> create(@Valid @RequestBody CategoryRequest request) {
+    public ResponseEntity<ApiResponse<CategoryResponse>> create(@Valid @RequestBody CategoryRequest request) {
+        CategoryResponse created = categoryService.create(request, SecurityUtils.getCurrentUserEmail());
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(categoryService.create(request, SecurityUtils.getCurrentUserEmail()));
+                .body(ApiResponse.success(created, "Category created successfully"));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<CategoryResponse> update(@PathVariable Long id,
+    public ResponseEntity<ApiResponse<CategoryResponse>> update(@PathVariable Long id,
             @Valid @RequestBody CategoryRequest request) {
-        return ResponseEntity.ok(categoryService.update(id, request, SecurityUtils.getCurrentUserEmail()));
+        return ResponseEntity.ok(ApiResponse.success(
+                categoryService.update(id, request, SecurityUtils.getCurrentUserEmail())));
     }
 
     @DeleteMapping("/{id}")

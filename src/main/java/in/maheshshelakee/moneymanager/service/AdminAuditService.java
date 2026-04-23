@@ -1,17 +1,17 @@
 package in.maheshshelakee.moneymanager.service;
 
+import in.maheshshelakee.moneymanager.dto.AdminAuditLogDto;
 import in.maheshshelakee.moneymanager.entity.AdminAuditLog;
 import in.maheshshelakee.moneymanager.entity.ProfileEntity;
 import in.maheshshelakee.moneymanager.repository.AdminAuditLogRepository;
 import in.maheshshelakee.moneymanager.repository.ProfileRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.aop.interceptor.AsyncUncaughtExceptionHandler;
-import org.springframework.context.annotation.Bean;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-
-import java.lang.reflect.Method;
 
 @Slf4j
 @Service
@@ -20,6 +20,16 @@ public class AdminAuditService {
 
     private final AdminAuditLogRepository adminAuditLogRepository;
     private final ProfileRepository profileRepository;
+
+    /**
+     * Returns paginated audit logs, converted to DTOs to avoid
+     * exposing JPA entities (and their lazy associations) to the client.
+     */
+    public Page<AdminAuditLogDto> getAuditLogs(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        return adminAuditLogRepository.findAllByOrderByCreatedAtDesc(pageable)
+                .map(this::toDto);
+    }
 
     // FIX 1: Removed manual .createdAt(LocalDateTime.now()) from the builder.
     //         @CreationTimestamp on AdminAuditLog.createdAt handles timestamping automatically.
@@ -56,4 +66,17 @@ public class AdminAuditService {
                     adminEmail, action, ex);
         }
     }
+
+    private AdminAuditLogDto toDto(AdminAuditLog entity) {
+        return AdminAuditLogDto.builder()
+                .id(entity.getId())
+                .adminEmail(entity.getAdmin() != null ? entity.getAdmin().getEmail() : null)
+                .targetUserEmail(entity.getTargetUser() != null ? entity.getTargetUser().getEmail() : null)
+                .action(entity.getAction())
+                .details(entity.getDetails())
+                .ipAddress(entity.getIpAddress())
+                .createdAt(entity.getCreatedAt())
+                .build();
+    }
 }
+
